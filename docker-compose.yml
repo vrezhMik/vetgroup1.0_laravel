@@ -1,0 +1,74 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: vetgroup
+      MYSQL_USER: vetgroup
+      MYSQL_PASSWORD: vetgroup
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  backend:
+    build:
+      context: ./vetgroup_laravel
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./vetgroup_laravel/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: vetgroup
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      APP_URL: http://localhost:8000
+    depends_on:
+      - mysql
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./vetgroup_laravel:/var/www/html
+      - ./vetgroup_laravel/storage:/var/www/html/storage
+      - ./vetgroup_laravel/public/uploads:/var/www/html/public/uploads
+
+  scheduler:
+    build:
+      context: ./vetgroup_laravel
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./vetgroup_laravel/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: vetgroup
+      DB_USERNAME: root
+      DB_PASSWORD: root
+    depends_on:
+      - mysql
+    volumes:
+      - ./vetgroup_laravel:/var/www/html
+      - ./vetgroup_laravel/storage:/var/www/html/storage
+    command: php artisan schedule:work --verbose --no-interaction
+
+  frontend:
+    build:
+      context: ./vetgroup
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./vetgroup/.env.local
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
+

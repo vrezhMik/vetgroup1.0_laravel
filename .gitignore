@@ -1,0 +1,29 @@
+# OS / Editor
+.DS_Store
+.idea
+.vscode
+*.log
+
+# Root dumps / exports
+vetgroup.sql
+
+# Frontend (Next.js)
+vetgroup/node_modules
+vetgroup/.next
+vetgroup/.turbo
+vetgroup/.eslintcache
+vetgroup/.env.local
+vetgroup/.env.*
+
+# Backend (Laravel)
+vetgroup_laravel/vendor
+vetgroup_laravel/node_modules
+vetgroup_laravel/.env
+vetgroup_laravel/.env.*
+vetgroup_laravel/storage/logs
+vetgroup_laravel/storage/framework
+vetgroup_laravel/storage/debugbar
+vetgroup_laravel/public/storage
+
+# Docker / misc
+docker-compose.override.yml
