@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Order extends Model
 {
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'document_id',
         'order_id',
@@ -24,12 +29,18 @@ class Order extends Model
         'locale',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
             'created' => 'datetime',
             'products' => 'array',
             'products_json' => 'array',
+            'complited' => 'boolean',
         ];
     }
 
@@ -39,3 +50,4 @@ class Order extends Model
         return $this->belongsTo(VetgroupUser::class, 'vetgroup_user_id');
     }
 }
+

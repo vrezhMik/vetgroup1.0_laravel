@@ -201,12 +201,15 @@ export const productsStore = create<ProductsStateInterface>((set) => ({
 
   resetSelectedCategories: () => set({ selectedCategories: [] }),
 
-  setSelectedCategory: (category) => {
+	
+	
+    setSelectedCategory: (category) => {
     set((state) => {
-      const isSelected = state.selectedCategories.includes(category);
-      const nextSelected = isSelected
-        ? state.selectedCategories.filter((c) => c !== category)
-        : [...state.selectedCategories, category];
+      const isSelected =
+        state.selectedCategories.length > 0 &&
+        state.selectedCategories[0] === category;
+
+      const nextSelected = isSelected ? [] : [category];
 
       return {
         selectedCategories: nextSelected,

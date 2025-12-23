@@ -6,7 +6,7 @@ import HamburgerSVG from "@/components/Elements/Icons/HamburgerSVG";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Cookies from "js-cookie";
-import { get_categories, get_products } from "@/utils/query";
+import { get_categories } from "@/utils/query";
 import { productsStore } from "@/store/store";
 import { useRouter } from "next/navigation";
 type Category = { title: string };
@@ -37,7 +37,7 @@ export default function UserMenu() {
     setHamburger(false);
 
     const store = productsStore.getState();
-    const { categorizedProducts, selectedCategories } = store;
+    const { selectedCategories } = store;
     const isSelected = selectedCategories.includes(cat);
 
     // Toggle category selection
@@ -64,23 +64,7 @@ export default function UserMenu() {
       }, 50);
     }, 0);
 
-    const isAlreadyFetched = categorizedProducts.some(
-      (item) => item.cat === cat
-    );
-
-    if (!isAlreadyFetched) {
-      try {
-        const data = await get_products(0, 18, cat);
-        if (data?.products) {
-          store.addCategorizedProducts(cat, data.products);
-          store.setCategorizedStart(cat, 18);
-        }
-      } finally {
-        store.setLoading(false);
-      }
-    } else {
-      store.setLoading(false);
-    }
+    // Actual fetching is handled by ProductContainer via productsStore state.
   };
 
   const cleanFilters = () => {
@@ -149,3 +133,4 @@ export default function UserMenu() {
     </div>
   );
 }
+

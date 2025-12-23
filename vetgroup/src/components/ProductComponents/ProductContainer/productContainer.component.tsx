@@ -36,6 +36,7 @@ export default function ProductContainer() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const observerRef = useRef<HTMLDivElement | null>(null);
   const hasLoadedRef = useRef<{ [cat: string]: boolean }>({});
+  const noMoreRef = useRef<{ [key: string]: boolean }>({});
   const fetchData = useCallback(async () => {
     const store = productsStore.getState();
     const limit = 18;
@@ -43,21 +44,39 @@ export default function ProductContainer() {
       ? store.categorizedStart[selectedCategory] || 0
       : store.currentStart;
 
-    const data = await get_products(start, limit, selectedCategory);
+    const key = selectedCategory || "__ALL__";
 
-    if (data?.products?.length > 0) {
-      if (selectedCategory) {
-        if (!hasLoadedRef.current[selectedCategory]) {
-          store.clearCategorizedProducts(selectedCategory);
-          hasLoadedRef.current[selectedCategory] = true;
+    // Stop requesting if we've already reached the end for this key.
+    if (noMoreRef.current[key]) {
+      return;
+    }
+
+    store.setLoading(true);
+
+    try {
+      const data = await get_products(start, limit, selectedCategory);
+
+      if (data?.products?.length > 0) {
+        if (selectedCategory) {
+          if (!hasLoadedRef.current[selectedCategory]) {
+            store.clearCategorizedProducts(selectedCategory);
+            hasLoadedRef.current[selectedCategory] = true;
+          }
+
+          store.addCategorizedProducts(selectedCategory, data.products);
+          store.setCategorizedStart(selectedCategory, start + limit);
+        } else {
+          store.add_product(data.products);
+          store.setCurrentStart(start + limit);
         }
-
-        store.addCategorizedProducts(selectedCategory, data.products);
-        store.setCategorizedStart(selectedCategory, start + limit);
-      } else {
-        store.add_product(data.products);
-        store.setCurrentStart(start + limit);
       }
+
+      // If fewer than `limit` products returned, we reached the end.
+      if (!data?.products || data.products.length < limit) {
+        noMoreRef.current[key] = true;
+      }
+    } finally {
+      store.setLoading(false);
     }
   }, [selectedCategory]);
 
@@ -231,3 +250,4 @@ export default function ProductContainer() {
     </div>
   );
 }
+

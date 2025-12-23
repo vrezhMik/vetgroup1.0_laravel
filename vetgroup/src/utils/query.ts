@@ -5,9 +5,27 @@ import { Item } from "@/classes/ItemClass";
 import { ApolloError } from "@apollo/client";
 import { loginFormState } from "@/store/store";
 import { GET_PRODCUTS_BY_ID } from "./fragments";
+import type { ProductType } from "@/utils/Types";
 
 function setWrongLogin(value: boolean) {
   loginFormState.setState({ isError: value });
+}
+function normalizeProductsPayload(payload: unknown): ProductType[] {
+  if (!payload || typeof payload !== "object") return [];
+
+  const root = payload as any;
+
+  const products =
+    Array.isArray(root.products) ? root.products :
+    Array.isArray(root.data?.products) ? root.data.products :
+    Array.isArray(root.data) ? root.data :
+    [];
+
+  return products.map((item: ProductType) => ({
+    ...item,
+    image: item?.image ?? null,
+    category: item?.category ?? { title: "" },
+  }));
 }
 
 export async function login(identifier: string, password: string) {
@@ -157,39 +175,40 @@ export async function change_password_query(
 export async function get_products(start: number, limit: number, cat?: string) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!baseUrl) {
-      throw new Error("API base URL is not configured");
-    }
+    if (!baseUrl) throw new Error("API base URL is not configured");
 
     const params = new URLSearchParams({
       start: String(start),
       limit: String(limit),
     });
+    if (cat) params.append("cat", cat);
 
-    if (cat) {
-      params.append("cat", cat);
-    }
-
-    const response = await fetch(`${baseUrl}/api/products?${params.toString()}`, {
+    const res = await fetch(`${baseUrl}/api/products?${params.toString()}`, {
       method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
+      headers: { Accept: "application/json" },
+      cache: "no-store", // avoids “stale 1 item” weirdness in Next
     });
 
-    if (!response.ok) {
-      console.error("Error fetching products:", response.statusText);
-      return { products: [] };
+    if (!res.ok) {
+      console.error("Error fetching products:", res.status, res.statusText);
+      return { products: [] as ProductType[] };
     }
 
-    const data = await response.json();
-    return data || { products: [] };
+    const json = await res.json();
+    const products = normalizeProductsPayload(json);
+
+    if (process.env.NODE_ENV !== "production") {
+      const keys = json && typeof json === "object" ? Object.keys(json) : [];
+      console.debug("[get_products] response keys:", keys);
+      console.debug("[get_products] normalized length:", products.length);
+    }
+
+    return { products };
   } catch (error) {
     console.error("Error fetching products:", error);
-    return { products: [] };
+    return { products: [] as ProductType[] };
   }
 }
-
 
 export async function add_order(
   items: Item[],

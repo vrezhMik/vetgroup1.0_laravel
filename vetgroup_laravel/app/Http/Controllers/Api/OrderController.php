@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -62,6 +65,17 @@ class OrderController extends Controller
             'items_list.*.Quantity' => ['required', 'numeric'],
         ]);
 
+        $productsCount = count($validated['products'] ?? []);
+        $itemsListCount = count($validated['items_list'] ?? []);
+
+        if ($productsCount !== $itemsListCount) {
+            return response()->json([
+                'message' => 'The products and items_list counts must match.',
+                'products_count' => $productsCount,
+                'items_list_count' => $itemsListCount,
+            ], 422);
+        }
+
         $transactionDate = Carbon::now()->format('d:m:Y H:i:s');
 
         $itemsList = collect($validated['items_list'])
@@ -82,18 +96,6 @@ class OrderController extends Controller
         $orderId = 'ORD-'.Str::upper(Str::random(6));
         $createdAt = Carbon::now();
 
-        $order = Order::create([
-            'document_id' => $validated['client_code'],
-            'order_id' => $orderId,
-            'vetgroup_user_id' => $validated['vetgroup_user_id'],
-            'user_id' => $validated['vetgroup_user_id'],
-            'created' => $createdAt,
-            'total' => $validated['total'],
-            'products' => $validated['products'],
-            'products_json' => $jsonFullData,
-            'complited' => false,
-        ]);
-
         $externalPayload = [
             'TransactionDate' => $transactionDate,
             'ClientID' => $validated['client_code'],
@@ -101,23 +103,95 @@ class OrderController extends Controller
             'Note' => '',
         ];
 
-        $externalResponse = Http::withBasicAuth('001', '001')
-            ->asJson()
-            ->post('http://87.241.165.71:8081/web/hs/Eportal/Order', $externalPayload);
+        $order = null;
+        $externalResponse = null;
 
-        if ($externalResponse->successful()) {
-            $order->complited = true;
-            $order->save();
+        try {
+            try {
+                $order = Order::create([
+                    'document_id' => $validated['client_code'],
+                    'order_id' => $orderId,
+                    'vetgroup_user_id' => $validated['vetgroup_user_id'],
+                    'user_id' => $validated['vetgroup_user_id'],
+                    'created' => $createdAt,
+                    'total' => $validated['total'],
+                    'products' => $validated['products'],
+                    'products_json' => $jsonFullData,
+                    'complited' => false,
+                ]);
+            } catch (QueryException $exception) {
+                Log::warning('Order create failed, retrying with JSON-encoded payloads.', [
+                    'order_id' => $orderId,
+                    'vetgroup_user_id' => $validated['vetgroup_user_id'],
+                    'client_code' => $validated['client_code'],
+                    'products_count' => $productsCount,
+                    'items_list_count' => $itemsListCount,
+                    'exception_message' => $exception->getMessage(),
+                ]);
+
+                $orderIdValue = DB::table('orders')->insertGetId([
+                    'document_id' => $validated['client_code'],
+                    'order_id' => $orderId,
+                    'vetgroup_user_id' => $validated['vetgroup_user_id'],
+                    'user_id' => $validated['vetgroup_user_id'],
+                    'created' => $createdAt,
+                    'total' => $validated['total'],
+                    'products' => json_encode($validated['products'], JSON_UNESCAPED_UNICODE),
+                    'products_json' => json_encode($jsonFullData, JSON_UNESCAPED_UNICODE),
+                    'complited' => false,
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ]);
+
+                $order = Order::query()->findOrFail($orderIdValue);
+            }
+
+            try {
+                $externalResponse = Http::withBasicAuth('001', '001')
+                    ->asJson()
+                    ->post('http://87.241.165.71:8081/web/hs/Eportal/Order', $externalPayload);
+            } catch (\Throwable $exception) {
+                Log::error('External order API call failed.', [
+                    'order_id' => $orderId,
+                    'vetgroup_user_id' => $validated['vetgroup_user_id'],
+                    'client_code' => $validated['client_code'],
+                    'products_count' => $productsCount,
+                    'items_list_count' => $itemsListCount,
+                    'exception_message' => $exception->getMessage(),
+                ]);
+            }
+
+            if ($externalResponse && $externalResponse->successful()) {
+                $order->complited = true;
+                $order->save();
+            }
+        } catch (\Throwable $exception) {
+            Log::error('Unexpected error while creating order.', [
+                'order_id' => $orderId,
+                'vetgroup_user_id' => $validated['vetgroup_user_id'],
+                'client_code' => $validated['client_code'],
+                'products_count' => $productsCount,
+                'items_list_count' => $itemsListCount,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Unable to create order at this time.',
+            ], 500);
         }
+
+        $statusCode = $externalResponse && $externalResponse->successful() ? 201 : 202;
 
         return response()->json([
             'order_id' => $order->order_id,
             'complited' => (bool) $order->complited,
             'external' => [
-                'status' => $externalResponse->status(),
-                'body' => $externalResponse->json() ?? $externalResponse->body(),
+                'status' => $externalResponse ? $externalResponse->status() : null,
+                'body' => $externalResponse
+                    ? ($externalResponse->json() ?? $externalResponse->body())
+                    : ['message' => 'External service unavailable'],
             ],
-        ], $externalResponse->successful() ? 201 : 202);
+        ], $statusCode);
     }
 
     public function show(Order $order): JsonResponse
@@ -156,3 +230,4 @@ class OrderController extends Controller
         ]);
     }
 }
+

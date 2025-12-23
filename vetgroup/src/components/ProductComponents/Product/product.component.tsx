@@ -69,7 +69,6 @@ export default function Product({ data, placeholder }: ProductPropsInterface) {
   };
   const imageUrl = currentProduct?.getImage();
   const fullImageUrl = buildImageUrl(imageUrl);
-  if (currentProduct.getPrice() <= 0) return;
   return (
     <section
       className={`${style.product} flex ${
@@ -119,7 +118,7 @@ export default function Product({ data, placeholder }: ProductPropsInterface) {
         <h2>
           {currentProduct.getDescription()}
           {/* <br /> */}
-          {/* <span>{currentProduct.getTitle()}</span> */}
+          <span style={{display:"block"}}>{currentProduct.getTitle()}</span> 
         </h2>
       </div>
       <div className={`flex ${style.productAction}`}>
