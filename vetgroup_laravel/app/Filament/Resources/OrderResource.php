@@ -42,15 +42,27 @@ class OrderResource extends Resource
                 Forms\Components\TextInput::make('total')
                     ->numeric()
                     ->nullable(),
-                Forms\Components\Textarea::make('products')
-                    ->nullable(),
-                Forms\Components\CodeEditor::make('products_json')
-                    ->label('Products JSON')
-                    ->json()
+                Forms\Components\Repeater::make('products')
+                    ->label('Products')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Name')
+                            ->disabled(),
+                        Forms\Components\TextInput::make('description')
+                            ->label('Description')
+                            ->disabled(),
+                        Forms\Components\TextInput::make('qty')
+                            ->label('Qty')
+                            ->numeric()
+                            ->disabled(),
+                        Forms\Components\TextInput::make('price')
+                            ->label('Price')
+                            ->numeric()
+                            ->disabled(),
+                    ])
+                    ->columns(4)
                     ->columnSpanFull()
-                    ->nullable(),
-                Forms\Components\ViewField::make('products_table')
-                    ->view('filament.forms.components.order-products-table'),
+                    ->disabled(),
                 Forms\Components\Toggle::make('complited')
                     ->label('Completed')
                     ->nullable(),

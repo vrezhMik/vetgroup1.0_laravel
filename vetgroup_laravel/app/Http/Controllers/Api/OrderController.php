@@ -198,24 +198,34 @@ class OrderController extends Controller
     {
         $productsArray = null;
 
-        // Prefer the structured products_json payload if present
-        if (is_array($order->products_json)) {
-            $productsArray = $order->products_json;
-        } elseif (is_string($order->products_json)) {
-            $decoded = json_decode($order->products_json, true);
-            if (is_array($decoded)) {
+        // Prefer the products column, which is expected to hold
+        // the actual order line items (name, description, qty, price).
+        if (is_array($order->products) && ! empty($order->products)) {
+            $productsArray = $order->products;
+        } elseif (is_string($order->products)) {
+            $decoded = json_decode($order->products, true);
+            if (is_array($decoded) && ! empty($decoded)) {
                 $productsArray = $decoded;
             }
         }
 
-        // Fallback to products field if needed
+        // Fallback to products_json for legacy data.
         if ($productsArray === null) {
-            if (is_array($order->products)) {
-                $productsArray = $order->products;
-            } elseif (is_string($order->products)) {
-                $decoded = json_decode($order->products, true);
-                if (is_array($decoded)) {
-                    $productsArray = $decoded;
+            $payload = $order->products_json;
+
+            if (is_string($payload)) {
+                $decoded = json_decode($payload, true);
+                $payload = is_array($decoded) ? $decoded : null;
+            }
+
+            if (is_array($payload)) {
+                // If this is the 1C-style envelope with an ItemsList,
+                // expose ItemsList as the products array so the frontend
+                // can render it.
+                if (array_key_exists('ItemsList', $payload) && is_array($payload['ItemsList'])) {
+                    $productsArray = $payload['ItemsList'];
+                } else {
+                    $productsArray = $payload;
                 }
             }
         }
@@ -230,4 +240,3 @@ class OrderController extends Controller
         ]);
     }
 }
-
