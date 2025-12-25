@@ -50,6 +50,17 @@ class ProductResource extends Resource
                 Forms\Components\TextInput::make('pack_price')
                     ->numeric()
                     ->nullable(),
+                Forms\Components\Select::make('categories')
+                    ->label('Categories')
+                    ->relationship('categories', 'title')
+                    ->multiple()
+                    ->preload()
+                    ->searchable()
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('title')
+                            ->required()
+                            ->maxLength(255),
+                    ]),
                 Forms\Components\ViewField::make('image_preview')
                     ->label('Current Image')
                     ->view('filament.forms.components.product-image-preview'),

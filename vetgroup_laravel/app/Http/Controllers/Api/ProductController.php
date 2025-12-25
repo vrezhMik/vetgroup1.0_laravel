@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,6 +27,39 @@ class ProductController extends Controller
         // apply any category filtering in PHP to avoid MySQL collation
         // issues between connection and column collations.
         $products = $query->get();
+
+        // Auto-assign categories for products that don't have any:
+        // if a category title is present in the product name or description,
+        // link that category to the product.
+        $allCategories = Category::query()->get();
+
+        foreach ($products as $product) {
+            if ($product->categories->isNotEmpty()) {
+                continue;
+            }
+
+            $name = mb_strtolower((string) $product->name, 'UTF-8');
+            $description = mb_strtolower((string) ($product->description ?? ''), 'UTF-8');
+
+            $matchedCategoryIds = [];
+
+            foreach ($allCategories as $category) {
+                $title = mb_strtolower((string) $category->title, 'UTF-8');
+
+                if ($title === '') {
+                    continue;
+                }
+
+                if (str_contains($name, $title) || str_contains($description, $title)) {
+                    $matchedCategoryIds[] = $category->id;
+                }
+            }
+
+            if ($matchedCategoryIds !== []) {
+                $product->categories()->syncWithoutDetaching($matchedCategoryIds);
+                $product->load('categories');
+            }
+        }
 
         if ($categoryTitle) {
             $products = $products
