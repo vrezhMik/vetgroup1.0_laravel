@@ -44,10 +44,6 @@ class AdminPanelProvider extends PanelProvider
                 FilamentInfoWidget::class,
                 SyncProductsWidget::class,
             ])
-            ->renderHook(
-                PanelsRenderHook::HEAD_END,
-                fn (): string => '<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>'
-            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
